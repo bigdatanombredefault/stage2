@@ -102,9 +102,7 @@ public class IndexingApp {
 				logger.info("Shutting down Indexing Service...");
 				app.stop();
 				try {
-					if (finalMetadataRepository != null) {
-						finalMetadataRepository.close();
-					}
+					finalMetadataRepository.close();
 				} catch (SQLException e) {
 					logger.error("Error closing database connection", e);
 				}

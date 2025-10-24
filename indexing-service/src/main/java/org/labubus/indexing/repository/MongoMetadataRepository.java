@@ -6,7 +6,6 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.ReplaceOptions;
 import org.bson.Document;
@@ -126,7 +125,7 @@ public class MongoMetadataRepository implements MetadataRepository {
 	}
 
 	@Override
-	public void close() throws SQLException {
+	public void close() {
 		if (mongoClient != null) {
 			mongoClient.close();
 			logger.info("Closed MongoDB connection");

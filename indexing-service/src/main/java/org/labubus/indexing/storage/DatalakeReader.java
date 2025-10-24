@@ -33,7 +33,6 @@ public class DatalakeReader {
 
 		List<String> lines = Files.readAllLines(trackingFile);
 		for (String line : lines) {
-			// Handle both formats: "bookId" or "bookId|path"
 			String[] parts = line.split("\\|");
 			String bookIdStr = parts[0].trim();
 
@@ -96,7 +95,6 @@ public class DatalakeReader {
 			throw new IOException("Datalake directory not found: " + datalakePath);
 		}
 
-		// Search in all subdirectories
 		try (Stream<Path> paths = Files.walk(datalakeDir)) {
 			return paths
 					.filter(Files::isRegularFile)

@@ -55,6 +55,7 @@ public class IngestionController {
 			health.put("books_downloaded", storage.getDownloadedBooksCount());
 		} catch (IOException e) {
 			health.put("books_downloaded", "error");
+			logger.error("Error getting book count for health check", e);
 		}
 
 		ctx.result(gson.toJson(health));

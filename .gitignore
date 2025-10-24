@@ -42,4 +42,5 @@ build/
 ### Project specific ###
 data/
 datalake/
+datamart/
 */dependency-reduced-pom.xml

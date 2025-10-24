@@ -2,8 +2,12 @@ package org.labubus.ingestion;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.labubus.ingestion.service.BookDownloader;
 import org.labubus.ingestion.service.BookIngestionService;
+import org.labubus.ingestion.service.GutenbergDownloader;
+import org.labubus.ingestion.storage.BucketDatalakeStorage;
 import org.labubus.ingestion.storage.DatalakeStorage;
+import org.labubus.ingestion.storage.TimestampDatalakeStorage;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -13,38 +17,42 @@ import static org.junit.jupiter.api.Assertions.*;
 public class IngestionServiceTest {
 
 	@Test
-	public void testDatalakeStorage(@TempDir Path tempDir) throws Exception {
-		// Create storage with temp directory
-		DatalakeStorage storage = new DatalakeStorage(tempDir.toString(), 10);
+	public void testBucketDatalakeStorage(@TempDir Path tempDir) throws Exception {
+		DatalakeStorage storage = new BucketDatalakeStorage(tempDir.toString(), 10);
 
-		// Save a book
-		String path = storage.saveBook(5, "Header content", "Body content");
-
-		// Verify it was saved
 		assertTrue(storage.isBookDownloaded(5));
 		assertNotNull(storage.getBookPath(5));
 		assertEquals(1, storage.getDownloadedBooksCount());
 
-		System.out.println("DatalakeStorage test passed!");
+		System.out.println("Bucket DatalakeStorage test passed!");
+	}
+
+	@Test
+	public void testTimestampDatalakeStorage(@TempDir Path tempDir) throws Exception {
+		DatalakeStorage storage = new TimestampDatalakeStorage(tempDir.toString());
+
+		String path = storage.saveBook(5, "Header content", "Body content");
+
+		assertTrue(storage.isBookDownloaded(5));
+		assertNotNull(storage.getBookPath(5));
+		assertEquals(1, storage.getDownloadedBooksCount());
+		assertTrue(path.contains("2025")); // Should contain year
+
+		System.out.println("Timestamp DatalakeStorage test passed!");
 	}
 
 	@Test
 	public void testBookDownload(@TempDir Path tempDir) throws Exception {
-		// Create storage
-		DatalakeStorage storage = new DatalakeStorage(tempDir.toString(), 10);
-
-		// Create service
-		BookIngestionService service = new BookIngestionService(
-				storage,
+		DatalakeStorage storage = new BucketDatalakeStorage(tempDir.toString(), 10);
+		BookDownloader downloader = new GutenbergDownloader(
 				"https://www.gutenberg.org/cache/epub",
 				30000
 		);
+		BookIngestionService service = new BookIngestionService(storage, downloader);
 
-		// Download a small book (Alice in Wonderland = 11)
 		System.out.println("Downloading book 11 (Alice in Wonderland)...");
 		String path = service.downloadAndSave(11);
 
-		// Verify
 		assertNotNull(path);
 		assertTrue(service.isBookDownloaded(11));
 
@@ -54,12 +62,12 @@ public class IngestionServiceTest {
 
 	@Test
 	public void testBookNotFound(@TempDir Path tempDir) {
-		DatalakeStorage storage = new DatalakeStorage(tempDir.toString(), 10);
-		BookIngestionService service = new BookIngestionService(
-				storage,
+		DatalakeStorage storage = new BucketDatalakeStorage(tempDir.toString(), 10);
+		BookDownloader downloader = new GutenbergDownloader(
 				"https://www.gutenberg.org/cache/epub",
 				30000
 		);
+		BookIngestionService service = new BookIngestionService(storage, downloader);
 
 		// Try to download a non-existent book
 		IOException exception = assertThrows(IOException.class, () -> {
@@ -77,19 +85,5 @@ public class IngestionServiceTest {
 		assertFalse(service.isBookDownloaded(999999));
 
 		System.out.println("Book not found test passed!\n");
-	}
-
-	@Test
-	public void testInvalidBookFormat(@TempDir Path tempDir) throws Exception {
-		DatalakeStorage storage = new DatalakeStorage(tempDir.toString(), 10);
-
-		// Create a mock book with invalid format (no markers)
-		String invalidContent = "This is a book\nwithout proper markers\nJust plain text";
-
-		// We need to test the splitHeaderBody method indirectly
-		// by creating a temporary file and trying to process it
-
-		// For now, just verify the logic - we'll test this when we have the full controller
-		System.out.println("Invalid format test structure ready (will be tested via API)\n");
 	}
 }

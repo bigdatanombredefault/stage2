@@ -29,7 +29,7 @@
         <gson.version>2.11.0</gson.version>
         <slf4j.version>2.0.16</slf4j.version>
         <junit.version>5.11.0</junit.version>
-        <mysql.version>9.1.0</mysql.version>
+        <mysql.version>9.4.0</mysql.version>
         <jmh.version>1.37</jmh.version>
     </properties>
 

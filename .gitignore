@@ -42,3 +42,4 @@ build/
 ### Project specific ###
 data/
 datalake/
+*/dependency-reduced-pom.xml

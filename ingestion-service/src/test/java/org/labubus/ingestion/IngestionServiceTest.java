@@ -20,6 +20,8 @@ public class IngestionServiceTest {
 	public void testBucketDatalakeStorage(@TempDir Path tempDir) throws Exception {
 		DatalakeStorage storage = new BucketDatalakeStorage(tempDir.toString(), 10);
 
+		String path = storage.saveBook(5, "Header content", "Body content");
+
 		assertTrue(storage.isBookDownloaded(5));
 		assertNotNull(storage.getBookPath(5));
 		assertEquals(1, storage.getDownloadedBooksCount());

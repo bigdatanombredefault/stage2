@@ -1,13 +1,26 @@
 package org.labubus.benchmarks;
 
+import org.labubus.indexing.model.BookMetadata;
+import org.labubus.indexing.repository.SqliteMetadataRepository;
+import org.labubus.indexing.service.MetadataExtractor;
+import org.labubus.indexing.storage.DatalakeReader;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
-import java.sql.*;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Benchmarks for database operations (INSERT, SELECT, queries)
+ * Tests how performance scales with database size
+ */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
@@ -16,126 +29,187 @@ import java.util.concurrent.TimeUnit;
 @Fork(1)
 public class DatabaseBenchmark {
 
-    private Connection sqliteConn;
-    private Connection postgresConn;
+	private static final String DATALAKE_PATH = "../datalake";
+	private static final String BENCHMARK_DB_DIR = "./benchmark-dbs";
 
-    @Param({"SQLite", "PostgreSQL"})
-    private String databaseType;
+	private DatalakeReader datalakeReader;
+	private MetadataExtractor metadataExtractor;
+	private SqliteMetadataRepository repository;
+	private List<Integer> availableBooks;
 
-    @Setup(Level.Trial)
-    public void setup() throws SQLException {
-        if ("SQLite".equals(databaseType)) {
-            setupSQLite();
-        } else if ("PostgreSQL".equals(databaseType)) {
-            setupPostgreSQL();
-        }
-    }
+	private BookMetadata newBookMetadata;
+	private int testBookIdForQuery;
 
-    @TearDown(Level.Trial)
-    public void tearDown() throws SQLException {
-        if (sqliteConn != null) sqliteConn.close();
-        if (postgresConn != null) postgresConn.close();
-    }
+	@Param({"10", "50", "100", "300"})
+	private int dbSize;
 
-    @Benchmark
-    public void insertBook(Blackhole blackhole) throws SQLException {
-        Connection conn = getConnection();
-        String sql = "INSERT INTO books (book_id, title, author, language, year, path) VALUES (?, ?, ?, ?, ?, ?)";
+	@Setup(Level.Trial)
+	public void setup() throws IOException, SQLException {
+		System.out.println("=== Database Benchmark Setup (dbSize=" + dbSize + ") ===");
 
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            int bookId = (int) (Math.random() * 100000);
-            stmt.setInt(1, bookId);
-            stmt.setString(2, "Test Book " + bookId);
-            stmt.setString(3, "Test Author");
-            stmt.setString(4, "english");
-            stmt.setInt(5, 2024);
-            stmt.setString(6, "bucket_1/" + bookId + ".txt");
+		datalakeReader = new DatalakeReader(DATALAKE_PATH);
+		metadataExtractor = new MetadataExtractor();
+		availableBooks = datalakeReader.getDownloadedBooks();
 
-            int result = stmt.executeUpdate();
-            blackhole.consume(result);
-        }
-    }
+		if (availableBooks.size() < dbSize + 1) {
+			throw new RuntimeException("Need at least " + (dbSize + 1) + " books, found " + availableBooks.size());
+		}
 
-    @Benchmark
-    public void selectBookById(Blackhole blackhole) throws SQLException {
-        Connection conn = getConnection();
-        String sql = "SELECT * FROM books WHERE book_id = ?";
+		Files.createDirectories(Paths.get(BENCHMARK_DB_DIR));
 
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, 1);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    blackhole.consume(rs.getString("title"));
-                }
-            }
-        }
-    }
+		String dbPath = BENCHMARK_DB_DIR + "/test_db_" + dbSize + ".sqlite";
+		repository = new SqliteMetadataRepository(dbPath);
 
-    @Benchmark
-    public void selectAllBooks(Blackhole blackhole) throws SQLException {
-        Connection conn = getConnection();
-        String sql = "SELECT * FROM books LIMIT 100";
+		System.out.println("Populating database with " + dbSize + " books...");
+		populateDatabase(dbSize);
 
-        List<String> titles = new ArrayList<>();
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                titles.add(rs.getString("title"));
-            }
-        }
-        blackhole.consume(titles);
-    }
+		int newBookId = availableBooks.get(dbSize);
+		String header = datalakeReader.readBookHeader(newBookId);
+		newBookMetadata = metadataExtractor.extractMetadata(
+				newBookId, header, "datalake/book_" + newBookId
+		);
 
-    private Connection getConnection() {
-        return "SQLite".equals(databaseType) ? sqliteConn : postgresConn;
-    }
+		testBookIdForQuery = availableBooks.get(dbSize / 2);
 
-    private void setupSQLite() throws SQLException {
-        sqliteConn = DriverManager.getConnection("jdbc:sqlite:benchmark.db");
-        createTable(sqliteConn);
-        insertSampleData(sqliteConn);
-    }
+		System.out.println("Database ready: " + dbSize + " books indexed");
+	}
 
-    private void setupPostgreSQL() throws SQLException {
-        try {
-            String url = "jdbc:postgresql://localhost:5432/benchmark_db";
-            postgresConn = DriverManager.getConnection(url, "postgres", "postgres");
-            createTable(postgresConn);
-            insertSampleData(postgresConn);
-        } catch (SQLException e) {
-            System.err.println("PostgreSQL unavailable, using SQLite: " + e.getMessage());
-            postgresConn = sqliteConn;
-        }
-    }
+	@TearDown(Level.Trial)
+	public void tearDown() throws SQLException, IOException {
+		if (repository != null) {
+			repository.close();
+		}
 
-    private void createTable(Connection conn) throws SQLException {
-        String sql = """
-            CREATE TABLE IF NOT EXISTS books (
-                book_id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL,
-                author TEXT,
-                language TEXT,
-                year INTEGER,
-                path TEXT
-            )
-            """;
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute(sql);
-        }
-    }
+		try {
+			Path dbDir = Paths.get(BENCHMARK_DB_DIR);
+			if (Files.exists(dbDir)) {
+				Files.walk(dbDir)
+						.sorted((a, b) -> -a.compareTo(b))
+						.forEach(path -> {
+							try {
+								Files.deleteIfExists(path);
+							} catch (IOException e) {
+							}
+						});
+			}
+		} catch (Exception e) {
+			System.err.println("Failed to cleanup: " + e.getMessage());
+		}
+	}
 
-    private void insertSampleData(Connection conn) throws SQLException {
-        String sql = "INSERT OR REPLACE INTO books VALUES (?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            for (int i = 1; i <= 100; i++) {
-                stmt.setInt(1, i);
-                stmt.setString(2, "Book " + i);
-                stmt.setString(3, "Author " + (i % 10));
-                stmt.setString(4, "english");
-                stmt.setInt(5, 2000 + (i % 25));
-                stmt.setString(6, "bucket_" + (i / 10) + "/" + i + ".txt");
-                stmt.executeUpdate();
-            }
-        }
-    }
+	/**
+	 * Benchmark: INSERT a new book metadata
+	 * Tests write performance
+	 */
+	@Benchmark
+	public void insertBookMetadata(Blackhole blackhole) throws SQLException {
+		int testId = 90000 + (int)(Math.random() * 1000);
+		BookMetadata testData = new BookMetadata(
+				testId,
+				newBookMetadata.title(),
+				newBookMetadata.author(),
+				newBookMetadata.language(),
+				newBookMetadata.year(),
+				newBookMetadata.path()
+		);
+
+		repository.save(testData);
+		blackhole.consume(testId);
+
+		repository.delete(testId);
+	}
+
+	/**
+	 * Benchmark: SELECT by book ID (primary key lookup)
+	 */
+	@Benchmark
+	public void selectBookById(Blackhole blackhole) throws SQLException {
+		Optional<BookMetadata> result = repository.findById(testBookIdForQuery);
+		blackhole.consume(result);
+	}
+
+	/**
+	 * Benchmark: COUNT all books
+	 */
+	@Benchmark
+	public void countAllBooks(Blackhole blackhole) throws SQLException {
+		int count = repository.count();
+		blackhole.consume(count);
+	}
+
+	/**
+	 * Benchmark: SELECT all books (full table scan)
+	 */
+	@Benchmark
+	public void selectAllBooks(Blackhole blackhole) throws SQLException {
+		List<BookMetadata> books = repository.findAll();
+		blackhole.consume(books);
+	}
+
+	/**
+	 * Benchmark: Query by author (uses index, but still requires filtering)
+	 * Simulates search by author pattern
+	 */
+	@Benchmark
+	public void queryByAuthorPattern(Blackhole blackhole) throws SQLException {
+		List<BookMetadata> allBooks = repository.findAll();
+		List<BookMetadata> filtered = new ArrayList<>();
+
+		for (BookMetadata book : allBooks) {
+			if (book.author() != null && book.author().toLowerCase().contains("a")) {
+				filtered.add(book);
+			}
+		}
+
+		blackhole.consume(filtered);
+	}
+
+	/**
+	 * Benchmark: Query by language (uses index)
+	 */
+	@Benchmark
+	public void queryByLanguage(Blackhole blackhole) throws SQLException {
+		List<BookMetadata> allBooks = repository.findAll();
+		List<BookMetadata> filtered = new ArrayList<>();
+
+		for (BookMetadata book : allBooks) {
+			if ("en".equalsIgnoreCase(book.language())) {
+				filtered.add(book);
+			}
+		}
+
+		blackhole.consume(filtered);
+	}
+
+	/**
+	 * Benchmark: Query by year (uses index)
+	 */
+	@Benchmark
+	public void queryByYear(Blackhole blackhole) throws SQLException {
+		List<BookMetadata> allBooks = repository.findAll();
+		List<BookMetadata> filtered = new ArrayList<>();
+
+		int targetYear = 1800;
+
+		for (BookMetadata book : allBooks) {
+			if (book.year() != null && book.year() >= targetYear && book.year() <= targetYear + 50) {
+				filtered.add(book);
+			}
+		}
+
+		blackhole.consume(filtered);
+	}
+
+	private void populateDatabase(int count) throws IOException, SQLException {
+		for (int i = 0; i < count; i++) {
+			int bookId = availableBooks.get(i);
+			String header = datalakeReader.readBookHeader(bookId);
+			BookMetadata metadata = metadataExtractor.extractMetadata(
+					bookId, header, "datalake/book_" + bookId
+			);
+			repository.save(metadata);
+		}
+
+		System.out.println("Database populated with " + repository.count() + " books");
+	}
 }

@@ -41,8 +41,7 @@ public class SearchApp {
 				indexReader.load();
 				logger.info("  Index loaded: {} unique words", indexReader.getStats().uniqueWords());
 			} catch (IOException e) {
-				logger.error("Failed to load inverted index", e);
-				throw new RuntimeException("Cannot start search service without index", e);
+                logger.warn("Failed to load inverted index - service will start but searches will fail until index is created", e);
 			}
 
 			int maxResults = Integer.parseInt(config.getProperty("search.max.results", "100"));

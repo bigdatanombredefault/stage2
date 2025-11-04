@@ -28,10 +28,8 @@ public class IndexingApp {
 		MetadataRepository metadataRepository = null;
 
 		try {
-			// Load base configuration from file
 			Properties config = loadConfiguration();
 
-			// Parse command line arguments (highest priority)
 			parseArguments(args, config);
 
 			int port = Integer.parseInt(config.getProperty("server.port", "7002"));
@@ -40,23 +38,18 @@ public class IndexingApp {
 			logger.info("Configuration:");
 			logger.info("  Port: {}", port);
 
-			// Create datalake reader
 			String datalakePath = config.getProperty("datalake.path", "../datalake");
 			DatalakeReader datalakeReader = new DatalakeReader(datalakePath);
 			logger.info("  Datalake Path: {}", datalakePath);
 
-			// Create metadata extractor
 			MetadataExtractor metadataExtractor = new MetadataExtractor();
 
-			// Create metadata repository based on configuration
 			String dbType = config.getProperty("db.type", "mysql");
 			metadataRepository = createMetadataRepository(dbType, config);
 
-			// Create inverted index writer based on configuration
 			String indexType = config.getProperty("index.type", "json");
 			InvertedIndexWriter indexWriter = createIndexWriter(indexType, config);
 
-			// Create inverted index builder
 			int minWordLength = Integer.parseInt(config.getProperty("index.min.word.length", "3"));
 			int maxWordLength = Integer.parseInt(config.getProperty("index.max.word.length", "50"));
 			String stopWordsStr = config.getProperty("index.stop.words", "");
@@ -68,7 +61,6 @@ public class IndexingApp {
 			logger.info("  Index Builder: min length={}, max length={}, stop words={}",
 					minWordLength, maxWordLength, stopWords.size());
 
-			// Load existing index if available
 			try {
 				indexWriter.load();
 				logger.info("  Loaded existing index: {} unique words", indexWriter.getIndex().size());
@@ -76,7 +68,6 @@ public class IndexingApp {
 				logger.info("  No existing index found, will create new one");
 			}
 
-			// Create indexing service
 			IndexingService indexingService = new IndexingService(
 					datalakeReader,
 					metadataExtractor,
@@ -85,10 +76,8 @@ public class IndexingApp {
 					indexWriter
 			);
 
-			// Create controller
 			IndexingController controller = new IndexingController(indexingService);
 
-			// Create and configure Javalin app
 			Javalin app = Javalin.create(javalinConfig -> {
 				javalinConfig.http.defaultContentType = "application/json";
 				javalinConfig.showJavalinBanner = false;
@@ -96,7 +85,6 @@ public class IndexingApp {
 
 			controller.registerRoutes(app);
 
-			// Shutdown hook
 			MetadataRepository finalMetadataRepository = metadataRepository;
 			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 				logger.info("Shutting down Indexing Service...");
@@ -132,11 +120,11 @@ public class IndexingApp {
 	private static void parseArguments(String[] args, Properties config) {
 		for (int i = 0; i < args.length; i++) {
 			if (args[i].startsWith("--") && i + 1 < args.length) {
-				String key = args[i].substring(2); // Remove "--"
+				String key = args[i].substring(2);
 				String value = args[i + 1];
 				config.setProperty(key, value);
 				logger.info("Command line argument: {} = {}", key, value);
-				i++; // Skip next argument as it's the value
+				i++;
 			} else if (args[i].equals("-h") || args[i].equals("--help")) {
 				printUsage();
 				System.exit(0);
@@ -174,7 +162,6 @@ public class IndexingApp {
 		if (type.equalsIgnoreCase("sqlite")) {
 			String dbPath = config.getProperty("db.sqlite.path", "../datamart/bookdb.sqlite");
 
-			// Create datamart directory if it doesn't exist
 			try {
 				java.nio.file.Files.createDirectories(java.nio.file.Paths.get(dbPath).getParent());
 			} catch (java.io.IOException e) {

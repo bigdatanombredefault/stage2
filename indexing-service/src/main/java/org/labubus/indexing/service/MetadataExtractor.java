@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
 public class MetadataExtractor {
 	private static final Logger logger = LoggerFactory.getLogger(MetadataExtractor.class);
 
-	// Regex patterns for extracting metadata
 	private static final Pattern TITLE_PATTERN = Pattern.compile("Title:\\s*(.+)", Pattern.CASE_INSENSITIVE);
 	private static final Pattern AUTHOR_PATTERN = Pattern.compile("Author:\\s*(.+)", Pattern.CASE_INSENSITIVE);
 	private static final Pattern LANGUAGE_PATTERN = Pattern.compile("Language:\\s*(.+)", Pattern.CASE_INSENSITIVE);
@@ -25,12 +24,10 @@ public class MetadataExtractor {
 		String language = extractLanguage(header);
 		Integer year = extractYear(header);
 
-		// Clean up extracted values
 		title = cleanString(title);
 		author = cleanString(author);
 		language = cleanString(language);
 
-		// Use defaults if extraction failed
 		if (title == null || title.isEmpty()) {
 			title = "Unknown Title (Book " + bookId + ")";
 		}
@@ -38,7 +35,7 @@ public class MetadataExtractor {
 			author = "Unknown Author";
 		}
 		if (language == null || language.isEmpty()) {
-			language = "en"; // Default to English
+			language = "en";
 		}
 
 		BookMetadata metadata = new BookMetadata(bookId, title, author, language, year, path);
@@ -91,10 +88,8 @@ public class MetadataExtractor {
 			return null;
 		}
 
-		// Remove extra whitespace
 		str = str.replaceAll("\\s+", " ").trim();
 
-		// Truncate if too long
 		if (str.length() > 300) {
 			str = str.substring(0, 297) + "...";
 		}

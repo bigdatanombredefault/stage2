@@ -29,7 +29,6 @@ public class MongoMetadataRepository implements MetadataRepository {
 			MongoDatabase database = mongoClient.getDatabase(databaseName);
 			this.booksCollection = database.getCollection("books");
 
-			// Create indexes
 			createIndexes();
 
 			logger.info("Connected to MongoDB: {} / {}", uri, databaseName);

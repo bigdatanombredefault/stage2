@@ -17,11 +17,9 @@ public class SqliteMetadataRepository implements MetadataRepository {
 	public SqliteMetadataRepository(String dbPath) throws SQLException {
 		this.dbPath = dbPath;
 		try {
-			// SQLite JDBC URL
 			String url = "jdbc:sqlite:" + dbPath;
 			this.connection = DriverManager.getConnection(url);
 
-			// Create table if not exists
 			createTableIfNotExists();
 
 			logger.info("Connected to SQLite database: {}", dbPath);
@@ -47,7 +45,6 @@ public class SqliteMetadataRepository implements MetadataRepository {
 		try (Statement stmt = connection.createStatement()) {
 			stmt.execute(sql);
 
-			// Create indexes
 			stmt.execute("CREATE INDEX IF NOT EXISTS idx_author ON books(author)");
 			stmt.execute("CREATE INDEX IF NOT EXISTS idx_language ON books(language)");
 			stmt.execute("CREATE INDEX IF NOT EXISTS idx_year ON books(year)");

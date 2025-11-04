@@ -39,28 +39,22 @@ public class IndexingService {
 	public void indexBook(int bookId) throws IOException, SQLException {
 		logger.info("Starting indexing for book {}", bookId);
 
-		// Check if book exists in datalake
 		if (!datalakeReader.bookExists(bookId)) {
 			throw new IOException("Book " + bookId + " not found in datalake");
 		}
 
-		// Read book files
 		String header = datalakeReader.readBookHeader(bookId);
 		String body = datalakeReader.readBookBody(bookId);
 
-		// Extract metadata
 		String path = "datalake/book_" + bookId; // Simplified path
 		BookMetadata metadata = metadataExtractor.extractMetadata(bookId, header, path);
 
-		// Save metadata to database
 		metadataRepository.save(metadata);
 		logger.info("Saved metadata for book {}: {}", bookId, metadata.title());
 
-		// Build inverted index
 		indexBuilder.indexBook(bookId, body);
 		logger.info("Indexed words for book {}", bookId);
 
-		// Save index
 		indexWriter.save();
 		logger.info("Successfully indexed book {}", bookId);
 	}
@@ -71,10 +65,8 @@ public class IndexingService {
 	public int rebuildIndex() throws IOException, SQLException {
 		logger.info("Starting full index rebuild...");
 
-		// Clear existing index
 		indexWriter.clear();
 
-		// Get all downloaded books
 		List<Integer> bookIds = datalakeReader.getDownloadedBooks();
 		logger.info("Found {} books to index", bookIds.size());
 

@@ -16,7 +16,6 @@ public class InvertedIndexBuilder {
 	private final int maxWordLength;
 	private final Set<String> stopWords;
 
-	// Pattern to extract words (letters only, no numbers or special chars)
 	private static final Pattern WORD_PATTERN = Pattern.compile("[a-zA-Z]+");
 
 	public InvertedIndexBuilder(InvertedIndexWriter indexWriter, int minWordLength, int maxWordLength, Set<String> stopWords) {
@@ -45,16 +44,13 @@ public class InvertedIndexBuilder {
 	private Set<String> extractWords(String text) {
 		Set<String> words = new HashSet<>();
 
-		// Convert to lowercase and split by whitespace
 		String[] tokens = text.toLowerCase().split("\\s+");
 
 		for (String token : tokens) {
-			// Extract only alphabetic words
 			var matcher = WORD_PATTERN.matcher(token);
 			while (matcher.find()) {
 				String word = matcher.group();
 
-				// Apply filters
 				if (isValidWord(word)) {
 					words.add(word);
 				}
@@ -68,12 +64,10 @@ public class InvertedIndexBuilder {
 	 * Check if a word is valid for indexing
 	 */
 	private boolean isValidWord(String word) {
-		// Length check
 		if (word.length() < minWordLength || word.length() > maxWordLength) {
 			return false;
 		}
 
-		// Stop words check
 		return !stopWords.contains(word);
 	}
 

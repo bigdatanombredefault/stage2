@@ -40,7 +40,6 @@ public class PostgreSqlMetadataRepository implements MetadataRepository {
 		try (Statement stmt = connection.createStatement()) {
 			stmt.execute(sql);
 
-			// Create indexes (ignore if they exist)
 			try {
 				stmt.execute("CREATE INDEX idx_author ON books(author)");
 			} catch (SQLException e) {

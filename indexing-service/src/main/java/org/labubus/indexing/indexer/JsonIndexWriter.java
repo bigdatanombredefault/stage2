@@ -26,7 +26,6 @@ public class JsonIndexWriter implements InvertedIndexWriter {
 		this.index = new HashMap<>();
 		this.gson = new GsonBuilder().setPrettyPrinting().create();
 
-		// Create datamart directory
 		try {
 			Files.createDirectories(Paths.get(datamartPath));
 			logger.info("JSON index writer initialized at: {}", datamartPath);
@@ -46,7 +45,6 @@ public class JsonIndexWriter implements InvertedIndexWriter {
 	public void save() throws IOException {
 		Path indexPath = Paths.get(datamartPath, indexFilename);
 
-		// Convert to sorted map for pretty output
 		Map<String, Set<Integer>> sortedIndex = new TreeMap<>(index);
 
 		String json = gson.toJson(sortedIndex);

@@ -25,16 +25,12 @@ public class IndexingController {
 	 * Register all routes with the Javalin app
 	 */
 	public void registerRoutes(Javalin app) {
-		// Health check endpoint
 		app.get("/health", this::handleHealth);
 
-		// Index a specific book
 		app.post("/index/update/{book_id}", this::handleIndexUpdate);
 
-		// Rebuild entire index
 		app.post("/index/rebuild", this::handleIndexRebuild);
 
-		// Get indexing status/statistics
 		app.get("/index/status", this::handleIndexStatus);
 
 		logger.info("Indexing routes registered");

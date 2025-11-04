@@ -73,7 +73,7 @@ public class IngestionApp {
 	private static void parseArguments(String[] args, Properties config) {
 		for (int i = 0; i < args.length; i++) {
 			if (args[i].startsWith("--") && i + 1 < args.length) {
-				String key = args[i].substring(2); // Remove "--"
+				String key = args[i].substring(2);
 				String value = args[i + 1];
 				config.setProperty(key, value);
 				logger.info("Command line argument: {} = {}", key, value);
